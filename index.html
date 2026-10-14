@@ -665,6 +665,38 @@
   let enemies = [];
   let particles = [];
   let floatingTexts = [];
+  let speechBubbles = [];
+  let idleBubbleTimer = 90;
+
+  const VILLI_PHRASES = [
+    "Maldito perez solo hace KS",
+    "GG Mejoren",
+    "Ahora juego Mejor que Brayden",
+    "Puse al loquito en 4, que ricoooo"
+  ];
+  let phraseBag = [];
+
+  function getNextVilliPhrase() {
+    if (phraseBag.length === 0) {
+      phraseBag = [...VILLI_PHRASES].sort(() => Math.random() - 0.5);
+    }
+    return phraseBag.pop();
+  }
+
+  function triggerVilliSpeech(enemy, customText = null, duration = 190) {
+    if (!enemy) return;
+    // Remove existing bubble on this enemy or keep max 2 bubbles on screen
+    speechBubbles = speechBubbles.filter(sb => sb.enemy !== enemy);
+    if (speechBubbles.length >= 2) speechBubbles.shift();
+    speechBubbles.push({
+      enemy,
+      x: enemy.x,
+      y: enemy.y - enemy.r - 18,
+      text: customText || getNextVilliPhrase(),
+      timer: duration,
+      maxTimer: duration
+    });
+  }
   let isDragging = false;
   let dragPos = { x: SLING_X, y: SLING_Y };
   let gameState = 'start'; // 'start' | 'playing' | 'won' | 'lost'
@@ -757,6 +789,8 @@
     flyingBirds = [];
     particles = [];
     floatingTexts = [];
+    speechBubbles = [];
+    idleBubbleTimer = 70;
     isDragging = false;
     settleTimer = 0;
 
@@ -778,6 +812,10 @@
 
     spawnNextBird();
     updateHUD();
+    if (enemies.length > 0) {
+      const randomEnemy = enemies[Math.floor(Math.random() * enemies.length)];
+      triggerVilliSpeech(randomEnemy);
+    }
   }
 
   function spawnNextBird() {
@@ -1063,11 +1101,15 @@
         }
       });
 
-      // Collide with enemies
+      // Collide with enemies or near-flyby speech trigger
       enemies.forEach(e => {
         const dx = bird.x - e.x;
         const dy = bird.y - e.y;
         const dist = Math.hypot(dx, dy);
+        if (dist < 150 && dist >= bird.r + e.r && !e.spokeThisFlight && Math.random() < 0.08) {
+          e.spokeThisFlight = true;
+          triggerVilliSpeech(e);
+        }
         if (dist < bird.r + e.r) {
           const nx = dx / (dist || 1);
           const ny = dy / (dist || 1);
@@ -1079,6 +1121,7 @@
 
           const relSpeed = Math.hypot(bird.vx - e.vx, bird.vy - e.vy);
           e.hp -= relSpeed * bird.mass * 5.5;
+          if (e.hp > 0) triggerVilliSpeech(e);
           e.vx += bird.vx * 0.55;
           e.vy += bird.vy * 0.45;
           bird.vx *= 0.5;
@@ -1240,7 +1283,10 @@
       if (allSlow || settleTimer > 210) {
         flyingBirds = [];
         settleTimer = 0;
+        enemies.forEach(e => { e.spokeThisFlight = false; });
         if (enemies.length > 0) {
+          const randomEnemy = enemies[Math.floor(Math.random() * enemies.length)];
+          triggerVilliSpeech(randomEnemy);
           spawnNextBird();
         }
       }
@@ -1279,6 +1325,27 @@
       ft.life -= 0.022;
     });
     floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+
+    // Periodic chatter if no bubble is active
+    if (enemies.length > 0) {
+      idleBubbleTimer--;
+      if (idleBubbleTimer <= 0) {
+        idleBubbleTimer = 230 + Math.floor(Math.random() * 120);
+        if (speechBubbles.length === 0) {
+          const randomEnemy = enemies[Math.floor(Math.random() * enemies.length)];
+          triggerVilliSpeech(randomEnemy);
+        }
+      }
+    }
+
+    speechBubbles.forEach(sb => {
+      sb.timer--;
+      if (sb.enemy && enemies.includes(sb.enemy)) {
+        sb.x = sb.enemy.x;
+        sb.y = sb.enemy.y - sb.enemy.r - 16;
+      }
+    });
+    speechBubbles = speechBubbles.filter(sb => sb.timer > 0 && sb.enemy && enemies.includes(sb.enemy));
   }
 
   // Rendering
@@ -1528,6 +1595,53 @@
       ctx.textAlign = 'center';
       ctx.strokeText(ft.text, ft.x, ft.y);
       ctx.fillText(ft.text, ft.x, ft.y);
+      ctx.restore();
+    });
+
+    // Villi Comic Speech Bubbles
+    speechBubbles.forEach(sb => {
+      ctx.save();
+      const alpha = sb.timer < 25 ? sb.timer / 25 : 1;
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.font = '900 14px Nunito, sans-serif';
+      const padX = 12;
+      const textWidth = ctx.measureText(sb.text).width;
+      const bw = textWidth + padX * 2;
+      const bh = 32;
+
+      // Keep bubble inside canvas bounds
+      const bx = Math.max(16, Math.min(W - bw - 16, sb.x - bw / 2));
+      const by = Math.max(68, sb.y - bh - 10);
+      const tailX = Math.max(bx + 14, Math.min(bx + bw - 14, sb.x));
+
+      // Bubble shadow & body
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#2c3e50';
+      ctx.lineWidth = 3;
+
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      // Pointer triangle toward Villi
+      ctx.beginPath();
+      ctx.moveTo(tailX - 7, by + bh - 1.5);
+      ctx.lineTo(sb.x, by + bh + 10);
+      ctx.lineTo(tailX + 7, by + bh - 1.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Cover seam line inside bubble
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(tailX - 6, by + bh - 3, 12, 4);
+
+      // Phrase text
+      ctx.fillStyle = '#1a1a2e';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(sb.text, bx + bw / 2, by + bh / 2 + 1);
       ctx.restore();
     });
   }
