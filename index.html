@@ -349,10 +349,11 @@
       <div class="badge">Pájaros: <span id="ui-birds">0</span> 🐦</div>
     </div>
     <div class="hud-group">
+      <button class="btn btn-blue" id="btn-survival-shortcut" title="Modo Supervivencia Infinita">🪂 Supervivencia</button>
       <button class="btn btn-purple" id="btn-boss-shortcut" title="Ir directo al Jefe Final (Nivel 4)">👑 Jefe Nv.4</button>
       <button class="btn btn-green" id="btn-music" title="Activar/Pausar Música">🎵 Música: ON</button>
       <button class="btn" id="btn-sound" title="Efectos de sonido">🔊</button>
-      <button class="btn btn-red" id="btn-restart" title="Reiniciar nivel">🔄</button>
+      <button class="btn btn-red" id="btn-restart" title="Reiniciar">🔄</button>
     </div>
   </div>
 
@@ -397,11 +398,14 @@
       </div>
 
       <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-        <button class="btn btn-green" id="btn-play" style="font-size:20px; padding:10px 24px;">
-          ▶️ ¡JUGAR AHORA!
+        <button class="btn btn-green" id="btn-play" style="font-size:19px; padding:10px 20px;">
+          ▶️ ¡JUGAR NIVELES!
         </button>
-        <button class="btn btn-purple" id="btn-play-boss" style="font-size:16px; padding:10px 18px;">
-          👑 Ir al Jefe Final (Nv. 4)
+        <button class="btn btn-blue" id="btn-play-survival" style="font-size:16px; padding:10px 16px;">
+          🪂 Modo Supervivencia
+        </button>
+        <button class="btn btn-purple" id="btn-play-boss" style="font-size:16px; padding:10px 16px;">
+          👑 Jefe Final (Nv. 4)
         </button>
       </div>
     </div>
@@ -765,6 +769,14 @@
   let currentLevel = 0;
   let score = 0;
   let totalScore = 0;
+  let isSurvivalMode = false;
+  let survivalKills = 0;
+  let survivalBestKills = parseInt(localStorage.getItem('angryVilli_bestKills') || '0', 10);
+  let survivalLives = 3;
+  let survivalWave = 1;
+  let survivalSpawnTimer = 40;
+  let survivalReloadTimer = 0;
+  const DEFENSE_LINE_X = 290;
   let birdsQueue = [];
   let activeBird = null;
   let flyingBirds = [];
@@ -944,6 +956,7 @@
       jumpCooldown: 180
     }));
 
+    isSurvivalMode = false;
     spawnNextBird();
     updateHUD();
     if (enemies.length > 0) {
@@ -952,7 +965,84 @@
     }
   }
 
+  function startSurvivalMode() {
+    isSurvivalMode = true;
+    score = 0;
+    survivalKills = 0;
+    survivalLives = 3;
+    survivalWave = 1;
+    survivalSpawnTimer = 30;
+    survivalReloadTimer = 0;
+    birdsQueue = ['yellow', 'blue', 'red', 'black'];
+    flyingBirds = [];
+    blocks = [];
+    enemies = [];
+    particles = [];
+    floatingTexts = [];
+    speechBubbles = [];
+    isDragging = false;
+    settleTimer = 0;
+    spawnNextBird();
+    spawnParachuteVilli();
+    updateHUD();
+  }
+
+  function spawnParachuteVilli() {
+    const isMiniBoss = survivalKills > 0 && survivalKills % 8 === 0 && Math.random() < 0.5;
+    const r = isMiniBoss ? 34 : (21 + Math.floor(Math.random() * 5));
+    const hp = isMiniBoss ? 95 : 35;
+    const x = 480 + Math.random() * 540;
+    const e = {
+      x,
+      y: -30,
+      r,
+      vx: 0,
+      vy: 1.05 + Math.min(1.6, survivalWave * 0.12),
+      angle: 0,
+      va: 0,
+      hp,
+      maxHp: hp,
+      isBoss: false,
+      enraged: false,
+      shieldTimer: 0,
+      hasParachute: true,
+      swayPhase: Math.random() * Math.PI * 2,
+       canopyColor: ['#e74c3c', '#9b59b6', '#f1c40f', '#3498db', '#e67e22'][Math.floor(Math.random() * 5)]
+    };
+    enemies.push(e);
+    if (Math.random() < 0.35) {
+      triggerVilliSpeech(e);
+    }
+
+    // Occasionally drop a parachute TNT crate that players can shoot in mid-air!
+    if (Math.random() < 0.25 && blocks.length < 4) {
+      const st = MATERIAL_STATS.tnt;
+      blocks.push({
+        x: 450 + Math.random() * 520,
+        y: -40,
+        w: 42,
+        h: 42,
+        vx: 0,
+        vy: 1.2,
+        angle: 0,
+        va: 0,
+        mat: 'tnt',
+        hp: 15,
+        maxHp: 15,
+        color: st.color,
+        border: st.border,
+        scoreVal: st.score,
+        hasParachute: true
+      });
+    }
+    updateHUD();
+  }
+
   function spawnNextBird() {
+    if (isSurvivalMode && birdsQueue.length < 3) {
+      const pool = ['yellow', 'blue', 'red', 'black', 'yellow', 'blue'];
+      birdsQueue.push(pool[Math.floor(Math.random() * pool.length)]);
+    }
     if (birdsQueue.length === 0) {
       activeBird = null;
       updateHUD();
@@ -978,6 +1068,15 @@
   }
 
   function updateHUD() {
+    if (isSurvivalMode) {
+      document.getElementById('ui-level').textContent = `🪂 Oleada ${survivalWave}`;
+      document.getElementById('ui-score').textContent = `${score}`;
+      document.getElementById('ui-enemies').textContent = `💀 ${survivalKills} (Récord: ${survivalBestKills})`;
+      document.getElementById('ui-birds').textContent = '❤️'.repeat(Math.max(0, survivalLives)) || '💀';
+      const bossHud = document.getElementById('boss-hud');
+      if (bossHud) bossHud.style.display = 'none';
+      return;
+    }
     document.getElementById('ui-level').textContent = `${currentLevel + 1}/${LEVELS.length}`;
     document.getElementById('ui-score').textContent = totalScore + score;
     document.getElementById('ui-enemies').textContent = enemies.length;
@@ -1063,7 +1162,7 @@
 
   function activateBirdPower() {
     if (flyingBirds.length === 0) return;
-    const bird = flyingBirds[0];
+    const bird = [...flyingBirds].reverse().find(b => !b.powerUsed);
     if (!bird || bird.powerUsed) return;
     bird.powerUsed = true;
 
@@ -1125,17 +1224,18 @@
     initAudio();
     const pos = getPointerPos(evt);
 
+    if (activeBird) {
+      const dist = Math.hypot(pos.x - activeBird.x, pos.y - activeBird.y);
+      if (dist <= 52) {
+        isDragging = true;
+        dragPos = pos;
+        return;
+      }
+    }
+
     if (flyingBirds.length > 0) {
       activateBirdPower();
       return;
-    }
-
-    if (activeBird) {
-      const dist = Math.hypot(pos.x - activeBird.x, pos.y - activeBird.y);
-      if (dist <= 48) {
-        isDragging = true;
-        dragPos = pos;
-      }
     }
   }
 
@@ -1174,6 +1274,9 @@
     flyingBirds.push(activeBird);
     activeBird = null;
     settleTimer = 0;
+    if (isSurvivalMode) {
+      survivalReloadTimer = 26;
+    }
     updateHUD();
   }
 
@@ -1305,7 +1408,12 @@
 
     // Update blocks
     blocks.forEach((b, i) => {
-      b.vy += gravity * 0.65;
+      if (b.hasParachute) {
+        b.vy = 1.25;
+        b.vx = Math.sin(Date.now() * 0.004 + i) * 0.7;
+      } else {
+        b.vy += gravity * 0.65;
+      }
       b.x += b.vx;
       b.y += b.vy;
       b.angle += b.va;
@@ -1314,6 +1422,7 @@
 
       const hh = b.h / 2;
       if (b.y + hh > GROUND_Y) {
+        b.hasParachute = false;
         const impact = Math.abs(b.vy);
         if (impact > 6.5) b.hp -= impact * 4.5;
         b.y = GROUND_Y - hh;
@@ -1355,17 +1464,47 @@
 
     // Update enemies
     enemies.forEach(e => {
-      e.vy += gravity * 0.75;
-      e.x += e.vx;
-      e.y += e.vy;
-      e.vx *= 0.94;
+      if (e.hasParachute) {
+        e.swayPhase = (e.swayPhase || 0) + 0.045;
+        e.vx = Math.sin(e.swayPhase) * 1.15;
+        const targetVy = 1.0 + Math.min(1.8, survivalWave * 0.13);
+        e.vy = e.vy * 0.9 + targetVy * 0.1;
+        e.x += e.vx;
+        e.y += e.vy;
+      } else {
+        e.vy += gravity * 0.75;
+        e.x += e.vx;
+        e.y += e.vy;
+        e.vx *= 0.94;
+      }
 
       if (e.y + e.r > GROUND_Y) {
-        const impact = Math.abs(e.vy);
-        if (impact > 5.2) e.hp -= impact * 6;
+        if (e.hasParachute) {
+          e.hasParachute = false;
+          e.vy = 0;
+        } else {
+          const impact = Math.abs(e.vy);
+          if (impact > 5.2) e.hp -= impact * 6;
+          e.vy = -e.vy * 0.28;
+        }
         e.y = GROUND_Y - e.r;
-        e.vy = -e.vy * 0.28;
         e.vx *= 0.75;
+
+        // In Survival Mode, landed Villis march/hop toward the slingshot defense line!
+        if (isSurvivalMode) {
+          e.vx = -0.85 - Math.min(1.4, survivalWave * 0.1);
+          if (Math.random() < 0.04) e.vy = -3.6;
+        }
+      }
+
+      // Check if a Villi breached the defense line in Survival Mode
+      if (isSurvivalMode && e.x - e.r <= DEFENSE_LINE_X && !e.breached) {
+        e.breached = true;
+        e.hp = 0;
+        survivalLives--;
+        playSound('boom');
+        addFloatingText(DEFENSE_LINE_X + 30, e.y - 20, '💔 ¡INVASIÓN! -1 VIDA', '#e74c3c');
+        updateHUD();
       }
 
       // Enemy-block collision
@@ -1475,9 +1614,22 @@
     // Check defeated enemies
     enemies = enemies.filter(e => {
       if (e.hp <= 0 || e.x > W + 90 || e.x < -90) {
+        if (e.breached) return false;
         playSound('pig');
-        score += 500;
-        addFloatingText(e.x, e.y - 10, '+500 🐷', '#2ecc71');
+        const airBonus = (isSurvivalMode && e.hasParachute) ? 250 : 0;
+        const pts = 500 + airBonus;
+        score += pts;
+        if (isSurvivalMode) {
+          survivalKills++;
+          survivalWave = 1 + Math.floor(survivalKills / 5);
+          if (survivalKills > survivalBestKills) {
+            survivalBestKills = survivalKills;
+            try { localStorage.setItem('angryVilli_bestKills', String(survivalBestKills)); } catch (err) {}
+          }
+          addFloatingText(e.x, e.y - 10, airBonus > 0 ? `+${pts} 🎯 ¡AIRE!` : `+${pts} 💀`, airBonus > 0 ? '#f1c40f' : '#2ecc71');
+        } else {
+          addFloatingText(e.x, e.y - 10, '+500 🐷', '#2ecc71');
+        }
         for (let k = 0; k < 18; k++) {
           particles.push({
             x: e.x, y: e.y,
@@ -1496,37 +1648,65 @@
 
     // Clean up stopped/removed flying birds
     flyingBirds = flyingBirds.filter(b => !b.remove);
-    if (flyingBirds.length > 0) {
-      const allSlow = flyingBirds.every(b => Math.hypot(b.vx, b.vy) < 0.65 && b.y >= GROUND_Y - b.r - 4);
-      settleTimer++;
-      if (allSlow || settleTimer > 210) {
-        flyingBirds = [];
-        settleTimer = 0;
-        enemies.forEach(e => { e.spokeThisFlight = false; });
-        if (enemies.length > 0) {
-          const randomEnemy = enemies[Math.floor(Math.random() * enemies.length)];
-          triggerVilliSpeech(randomEnemy);
+
+    if (isSurvivalMode) {
+      // Rapid reload in Survival Mode
+      if (!activeBird) {
+        survivalReloadTimer--;
+        if (survivalReloadTimer <= 0) {
           spawnNextBird();
         }
       }
-    }
+      // Remove old resting birds on ground to keep screen clean
+      flyingBirds = flyingBirds.filter(b => !(Math.hypot(b.vx, b.vy) < 0.8 && b.y >= GROUND_Y - b.r - 4));
 
-    // Check win/loss conditions
-    if (enemies.length === 0 && gameState === 'playing') {
-      const bonus = (birdsQueue.length + (activeBird ? 1 : 0)) * 300;
-      score += bonus;
-      totalScore += score;
-      score = 0;
-      updateHUD();
-      gameState = 'won';
-      playSound('win');
-      setTimeout(() => showModal(true), 650);
-    } else if (!activeBird && flyingBirds.length === 0 && birdsQueue.length === 0 && enemies.length > 0 && gameState === 'playing') {
-      settleTimer++;
-      if (settleTimer > 95) {
+      // Continuous Parachute Spawning
+      survivalSpawnTimer--;
+      if (survivalSpawnTimer <= 0) {
+        spawnParachuteVilli();
+        const baseInterval = Math.max(58, 175 - survivalWave * 14);
+        survivalSpawnTimer = baseInterval + Math.floor(Math.random() * 35);
+      }
+
+      // Check Survival Game Over
+      if (survivalLives <= 0 && gameState === 'playing') {
         gameState = 'lost';
         playSound('lose');
         showModal(false);
+      }
+    } else {
+      if (flyingBirds.length > 0) {
+        const allSlow = flyingBirds.every(b => Math.hypot(b.vx, b.vy) < 0.65 && b.y >= GROUND_Y - b.r - 4);
+        settleTimer++;
+        if (allSlow || settleTimer > 210) {
+          flyingBirds = [];
+          settleTimer = 0;
+          enemies.forEach(e => { e.spokeThisFlight = false; });
+          if (enemies.length > 0) {
+            const randomEnemy = enemies[Math.floor(Math.random() * enemies.length)];
+            triggerVilliSpeech(randomEnemy);
+            spawnNextBird();
+          }
+        }
+      }
+
+      // Check win/loss conditions for normal levels
+      if (enemies.length === 0 && gameState === 'playing') {
+        const bonus = (birdsQueue.length + (activeBird ? 1 : 0)) * 300;
+        score += bonus;
+        totalScore += score;
+        score = 0;
+        updateHUD();
+        gameState = 'won';
+        playSound('win');
+        setTimeout(() => showModal(true), 650);
+      } else if (!activeBird && flyingBirds.length === 0 && birdsQueue.length === 0 && enemies.length > 0 && gameState === 'playing') {
+        settleTimer++;
+        if (settleTimer > 95) {
+          gameState = 'lost';
+          playSound('lose');
+          showModal(false);
+        }
       }
     }
 
@@ -1640,7 +1820,11 @@
   function render() {
     // Sky gradient (Night Crimson Arena in Level 4 Boss Battle!)
     const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-    if (currentLevel === 3) {
+    if (isSurvivalMode) {
+      sky.addColorStop(0, '#0f2027');
+      sky.addColorStop(0.5, '#203a43');
+      sky.addColorStop(1, '#2c5364');
+    } else if (currentLevel === 3) {
       sky.addColorStop(0, '#1a1a2e');
       sky.addColorStop(0.6, '#4a154b');
       sky.addColorStop(1, '#833471');
@@ -1750,8 +1934,46 @@
       drawBird(bird);
     });
 
+    // Survival Defense Line indicator
+    if (isSurvivalMode) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(231, 76, 60, 0.75)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath();
+      ctx.moveTo(DEFENSE_LINE_X, 90);
+      ctx.lineTo(DEFENSE_LINE_X, GROUND_Y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#e74c3c';
+      ctx.font = 'bold 12px Fredoka One, sans-serif';
+      ctx.fillText('⚠️ LÍNEA DE DEFENSA', DEFENSE_LINE_X + 6, GROUND_Y - 10);
+      ctx.restore();
+    }
+
     // Blocks
     blocks.forEach(b => {
+      if (b.hasParachute) {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.strokeStyle = '#ecf0f1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-26, -b.h / 2 - 22);
+        ctx.lineTo(-12, -b.h / 2);
+        ctx.moveTo(26, -b.h / 2 - 22);
+        ctx.lineTo(12, -b.h / 2);
+        ctx.stroke();
+        ctx.fillStyle = '#f39c12';
+        ctx.strokeStyle = '#2c3e50';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(0, -b.h / 2 - 20, 28, Math.PI, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
       ctx.save();
       ctx.translate(b.x, b.y);
       ctx.rotate(b.angle);
@@ -1800,6 +2022,34 @@
         ctx.beginPath();
         ctx.arc(0, 0, e.r * 1.45, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
+      }
+
+      // Draw Parachute canopy & cords if parachuting
+      if (e.hasParachute) {
+        ctx.save();
+        ctx.translate(e.x, e.y);
+        const pr = e.r * 1.45;
+        const py = -e.r - 24;
+        ctx.strokeStyle = '#ecf0f1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-pr * 0.85, py);
+        ctx.lineTo(-e.r * 0.5, -e.r * 0.6);
+        ctx.moveTo(pr * 0.85, py);
+        ctx.lineTo(e.r * 0.5, -e.r * 0.6);
+        ctx.moveTo(0, py);
+        ctx.lineTo(0, -e.r);
+        ctx.stroke();
+
+        ctx.fillStyle = e.canopyColor || '#e74c3c';
+        ctx.strokeStyle = '#2c3e50';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, py, pr, Math.PI, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
         ctx.restore();
       }
 
@@ -1989,11 +2239,28 @@
 
   function showModal(won) {
     modalOverlay.classList.remove('hidden');
-    modalScore.textContent = totalScore + score;
     const bannerEl = document.getElementById('villalba-quote-banner');
     villalbaCutscene.style.display = 'flex';
     btnModalVoice.style.display = 'inline-flex';
 
+    if (isSurvivalMode) {
+      modalScore.textContent = `${survivalKills} Kills (Récord: ${survivalBestKills} 🏆) | ${score} pts`;
+      if (survivalKills >= 10) {
+        currentModalVoiceText = 'Los buscaré, y los mataré';
+        if (bannerEl) bannerEl.textContent = `🗣️ "¡${survivalKills} Villis caídos! ¡Los buscaré y los mataré!"`;
+      } else {
+        currentModalVoiceText = 'Jajaja, G G mejoren, les falta nivel';
+        if (bannerEl) bannerEl.textContent = '🗣️ "¡GG mejoren, les falta nivel!"';
+      }
+      speakVillalbaThreat();
+      modalTitle.textContent = '🪂 ¡FIN DE SUPERVIVENCIA!';
+      modalSubtitle.textContent = `Eliminaste a ${survivalKills} Villis seguidos (Oleada ${survivalWave}).`;
+      btnModalNext.textContent = '🏠 Modo Niveles (Nv. 1)';
+      btnModalNext.style.display = 'inline-flex';
+      return;
+    }
+
+    modalScore.textContent = totalScore + score;
     if (won) {
       currentModalVoiceText = 'Los buscaré, y los mataré';
       if (bannerEl) bannerEl.textContent = '🗣️ "¡Los buscaré y los mataré!"';
@@ -2049,25 +2316,42 @@
   document.getElementById('btn-play-boss').addEventListener('click', startBossLevelDirectly);
   document.getElementById('btn-boss-shortcut').addEventListener('click', startBossLevelDirectly);
 
+  function triggerSurvivalFromUI() {
+    initAudio();
+    if (musicEnabled) tryPlayMusic();
+    startOverlay.classList.add('hidden');
+    modalOverlay.classList.add('hidden');
+    gameState = 'playing';
+    startSurvivalMode();
+  }
+
+  document.getElementById('btn-play-survival').addEventListener('click', triggerSurvivalFromUI);
+  document.getElementById('btn-survival-shortcut').addEventListener('click', triggerSurvivalFromUI);
+
   document.getElementById('btn-restart').addEventListener('click', () => {
     modalOverlay.classList.add('hidden');
     score = 0;
     gameState = 'playing';
-    loadLevel(currentLevel);
+    if (isSurvivalMode) startSurvivalMode();
+    else loadLevel(currentLevel);
   });
 
   document.getElementById('btn-modal-retry').addEventListener('click', () => {
     modalOverlay.classList.add('hidden');
     score = 0;
     gameState = 'playing';
-    loadLevel(currentLevel);
+    if (isSurvivalMode) startSurvivalMode();
+    else loadLevel(currentLevel);
   });
 
   btnModalNext.addEventListener('click', () => {
     modalOverlay.classList.add('hidden');
     score = 0;
     gameState = 'playing';
-    if (currentLevel < LEVELS.length - 1) {
+    if (isSurvivalMode) {
+      totalScore = 0;
+      loadLevel(0);
+    } else if (currentLevel < LEVELS.length - 1) {
       loadLevel(currentLevel + 1);
     } else {
       totalScore = 0;
