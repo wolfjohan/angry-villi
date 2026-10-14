@@ -1,0 +1,1635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Angry Villi - El Juego</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;900&display=swap');
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1a1a2e;
+      font-family: 'Nunito', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #game-wrapper {
+      position: relative;
+      width: 1100px;
+      height: 620px;
+      max-width: 100vw;
+      max-height: 100vh;
+      box-shadow: 0 15px 45px rgba(0,0,0,0.6);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #87CEEB;
+      border: 4px solid #fff;
+    }
+
+    canvas#game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    canvas#game-canvas:active {
+      cursor: grabbing;
+    }
+
+    .hud-bar {
+      position: absolute;
+      top: 12px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 10;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .hud-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      pointer-events: auto;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      background: rgba(255, 255, 255, 0.92);
+      border: 3px solid #2c3e50;
+      border-radius: 12px;
+      padding: 6px 12px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 16px;
+      color: #2c3e50;
+      box-shadow: 0 4px 0 #2c3e50;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .badge span {
+      color: #e74c3c;
+    }
+
+    .btn {
+      background: #ff9f43;
+      border: 3px solid #2c3e50;
+      border-radius: 12px;
+      padding: 6px 12px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 14px;
+      color: #fff;
+      text-shadow: 1px 1px 0 #2c3e50;
+      box-shadow: 0 4px 0 #2c3e50;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s, background 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn:hover {
+      background: #ffaf60;
+      transform: translateY(-1px);
+      box-shadow: 0 5px 0 #2c3e50;
+    }
+
+    .btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #2c3e50;
+    }
+
+    .btn-green { background: #2ecc71; }
+    .btn-green:hover { background: #48d683; }
+
+    .btn-blue { background: #3498db; }
+    .btn-blue:hover { background: #5dade2; }
+
+    .btn-purple { background: #9b59b6; }
+    .btn-purple:hover { background: #af7ac5; }
+
+    .btn-red { background: #e74c3c; }
+    .btn-red:hover { background: #ec7063; }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 25;
+      transition: opacity 0.25s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .card {
+      background: linear-gradient(180deg, #fff9e6 0%, #ffeaa7 100%);
+      border: 5px solid #2c3e50;
+      border-radius: 24px;
+      padding: 26px 32px;
+      text-align: center;
+      max-width: 560px;
+      width: 92%;
+      box-shadow: 0 12px 0 #2c3e50, 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    .game-title {
+      font-family: 'Fredoka One', cursive;
+      font-size: 54px;
+      color: #e74c3c;
+      text-shadow: 3px 3px 0 #2c3e50, -2px -2px 0 #fff;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      line-height: 1;
+    }
+
+    .subtitle {
+      font-weight: 900;
+      color: #2c3e50;
+      font-size: 16px;
+      margin-bottom: 14px;
+    }
+
+    .preview-box {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      margin: 12px 0 18px;
+      background: rgba(255,255,255,0.65);
+      padding: 12px;
+      border-radius: 16px;
+      border: 2px dashed #2c3e50;
+    }
+
+    .bird-legend {
+      text-align: left;
+      font-size: 13px;
+      color: #2c3e50;
+      line-height: 1.5;
+    }
+
+    .hint-bar {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      pointer-events: none;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    #file-input {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+  <canvas id="game-canvas" width="1100" height="620"></canvas>
+
+  <div class="hud-bar">
+    <div class="hud-group">
+      <div class="badge">Nivel: <span id="ui-level">1/3</span></div>
+      <div class="badge">Puntos: <span id="ui-score">0</span></div>
+      <div class="badge">Villis: <span id="ui-enemies">0</span> 🐷</div>
+      <div class="badge">Pájaros: <span id="ui-birds">0</span> 🐦</div>
+    </div>
+    <div class="hud-group">
+      <button class="btn btn-blue" id="btn-toggle-face">
+        🎭 Cara: <span id="face-mode-label">Foto Villi</span>
+      </button>
+      <button class="btn btn-green" id="btn-upload">📸 Subir Foto</button>
+      <input type="file" id="file-input" accept="image/*">
+      <button class="btn btn-purple" id="btn-download-hud">💾 Descargar .HTML</button>
+      <button class="btn" id="btn-sound">🔊</button>
+      <button class="btn btn-red" id="btn-restart">🔄</button>
+    </div>
+  </div>
+
+  <div class="hint-bar">
+    💡 Arrastra el pájaro en la resortera para lanzar. ¡Haz CLIC o presiona ESPACIO en el aire para activar su poder!
+  </div>
+
+  <!-- Pantalla de Inicio -->
+  <div class="overlay" id="start-overlay">
+    <div class="card">
+      <div class="game-title">ANGRY VILLI</div>
+      <div class="subtitle">¡Derriba las estructuras y derrota a los cerditos Villi!</div>
+      
+      <div class="preview-box">
+        <canvas id="villi-preview" width="110" height="110" style="width:110px;height:110px;cursor:default;"></canvas>
+        <div class="bird-legend">
+          <div>🔴 <b>Rojo:</b> Fuerte e implacable.</div>
+          <div>🟡 <b>Amarillo:</b> Clic en el aire para <b>Turbo Veloz</b>.</div>
+          <div>🔵 <b>Azul:</b> Clic en el aire para <b>Dividirse en 3</b>.</div>
+          <div>⚫ <b>Negro:</b> Clic en el aire o impacto para <b>Explotar</b>.</div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn btn-green" id="btn-play" style="font-size:20px; padding:10px 24px;">
+          ▶️ ¡JUGAR AHORA!
+        </button>
+        <button class="btn btn-blue" id="btn-upload-start" style="font-size:15px; padding:10px 14px;">
+          📸 Cargar Foto
+        </button>
+        <button class="btn btn-purple" id="btn-download-start" style="font-size:15px; padding:10px 14px;">
+          💾 Descargar archivo .HTML
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pantalla de Victoria / Derrota -->
+  <div class="overlay hidden" id="modal-overlay">
+    <div class="card">
+      <div class="game-title" id="modal-title" style="font-size:42px;">¡NIVEL SUPERADO!</div>
+      <div class="subtitle" id="modal-subtitle" style="font-size:18px; margin-top:8px;">¡Todos los Villis fueron derribados!</div>
+      <div class="badge" style="justify-content:center; margin: 16px auto; width: fit-content; font-size:22px;">
+        Puntuación Total: <span id="modal-score">0</span>
+      </div>
+      <div style="display:flex; gap:12px; justify-content:center; margin-top:16px;">
+        <button class="btn btn-red" id="btn-modal-retry" style="font-size:16px; padding:10px 18px;">
+          🔄 Reintentar
+        </button>
+        <button class="btn btn-green" id="btn-modal-next" style="font-size:16px; padding:10px 18px;">
+          ⏭️ Siguiente Nivel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('game-canvas');
+  const ctx = canvas.getContext('2d');
+  const previewCanvas = document.getElementById('villi-preview');
+  const previewCtx = previewCanvas.getContext('2d');
+
+  const W = 1100;
+  const H = 620;
+  const GROUND_Y = 560;
+  const SLING_X = 195;
+  const SLING_Y = 425;
+  const MAX_PULL = 105;
+
+  // Audio System (Web Audio API)
+  let soundEnabled = true;
+  let audioCtx = null;
+  function initAudio() {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) audioCtx = new AudioContext();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  function playSound(type) {
+    if (!soundEnabled) return;
+    try {
+      initAudio();
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'launch') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(190, now);
+        osc.frequency.exponentialRampToValueAtTime(580, now + 0.22);
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.24);
+        osc.start(now);
+        osc.stop(now + 0.24);
+      } else if (type === 'power') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.18);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      } else if (type === 'boom') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(130, now);
+        osc.frequency.exponentialRampToValueAtTime(28, now + 0.42);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      } else if (type === 'hit') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(55, now + 0.09);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } else if (type === 'pig') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(480, now);
+        osc.frequency.exponentialRampToValueAtTime(160, now + 0.28);
+        gain.gain.setValueAtTime(0.24, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      } else if (type === 'win') {
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = 'triangle';
+          o.frequency.value = freq;
+          o.connect(g);
+          g.connect(audioCtx.destination);
+          g.gain.setValueAtTime(0.18, now + idx * 0.1);
+          g.gain.linearRampToValueAtTime(0.001, now + idx * 0.1 + 0.25);
+          o.start(now + idx * 0.1);
+          o.stop(now + idx * 0.1 + 0.26);
+        });
+      } else if (type === 'lose') {
+        [392, 349.23, 311.13, 261.63].forEach((freq, idx) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = 'sawtooth';
+          o.frequency.value = freq;
+          o.connect(g);
+          g.connect(audioCtx.destination);
+          g.gain.setValueAtTime(0.14, now + idx * 0.14);
+          g.gain.linearRampToValueAtTime(0.001, now + idx * 0.14 + 0.28);
+          o.start(now + idx * 0.14);
+          o.stop(now + idx * 0.14 + 0.3);
+        });
+      }
+    } catch (e) {}
+  }
+
+  // Face Modes & Embedded Default Villi Photo
+  const DEFAULT_VILLI_PHOTO = "data:image/jpeg;base64,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";
+  let faceMode = 'photo'; // 'photo' | 'villi' | 'pig'
+  let customPhoto = new Image();
+  let customPhotoLoaded = false;
+  customPhoto.onload = () => {
+    customPhotoLoaded = true;
+    drawVilliPreview();
+  };
+  customPhoto.src = DEFAULT_VILLI_PHOTO;
+
+  function updateFaceModeLabel() {
+    const label = document.getElementById('face-mode-label');
+    if (faceMode === 'photo') label.textContent = 'Foto Villi';
+    else if (faceMode === 'villi') label.textContent = 'Caricatura Villi';
+    else label.textContent = 'Cerdito Clásico';
+    drawVilliPreview();
+  }
+
+  function drawVilliCharacter(ctx, x, y, r, hurtRatio = 0, mode = faceMode) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    if (mode === 'photo' && customPhoto && customPhotoLoaded) {
+      // Green pig ears behind photo
+      ctx.fillStyle = '#58d68d';
+      ctx.strokeStyle = '#1e8449';
+      ctx.lineWidth = Math.max(2, r * 0.1);
+      ctx.beginPath();
+      ctx.arc(-r * 0.72, -r * 0.72, r * 0.28, 0, Math.PI * 2);
+      ctx.arc(r * 0.72, -r * 0.72, r * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(customPhoto, -r, -r, r * 2, r * 2);
+      if (hurtRatio > 0.35) {
+        ctx.fillStyle = `rgba(231, 76, 60, ${Math.min(0.45, hurtRatio * 0.5)})`;
+        ctx.fillRect(-r, -r, r * 2, r * 2);
+      }
+      ctx.restore();
+
+      // Circular border
+      ctx.strokeStyle = hurtRatio > 0.35 ? '#e74c3c' : '#2ecc71';
+      ctx.lineWidth = Math.max(3, r * 0.12);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Band-aid when damaged
+      if (hurtRatio > 0.3) {
+        ctx.save();
+        ctx.translate(r * 0.35, -r * 0.48);
+        ctx.rotate(0.35);
+        ctx.fillStyle = '#f5cba7';
+        ctx.strokeStyle = '#935116';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(-r * 0.28, -r * 0.1, r * 0.56, r * 0.2);
+        ctx.strokeRect(-r * 0.28, -r * 0.1, r * 0.56, r * 0.2);
+        ctx.restore();
+      }
+
+      ctx.restore();
+      return;
+    }
+
+    if (mode === 'villi') {
+      // Ears
+      ctx.fillStyle = '#7bed9f';
+      ctx.strokeStyle = '#1e8449';
+      ctx.lineWidth = Math.max(2, r * 0.09);
+      ctx.beginPath();
+      ctx.arc(-r * 0.75, -r * 0.68, r * 0.26, 0, Math.PI * 2);
+      ctx.arc(r * 0.75, -r * 0.68, r * 0.26, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Head base (Caricatura Villi: warm skin/green hybrid with spiky hair & cool glasses/grin)
+      const grad = ctx.createRadialGradient(-r * 0.25, -r * 0.25, r * 0.1, 0, 0, r);
+      grad.addColorStop(0, '#a3f7bf');
+      grad.addColorStop(1, '#2ecc71');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Spiky hair tuft on top
+      ctx.fillStyle = '#2c3e50';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.55, -r * 0.72);
+      ctx.lineTo(-r * 0.25, -r * 1.18);
+      ctx.lineTo(-r * 0.05, -r * 0.85);
+      ctx.lineTo(r * 0.2, -r * 1.22);
+      ctx.lineTo(r * 0.35, -r * 0.82);
+      ctx.lineTo(r * 0.6, -r * 1.05);
+      ctx.lineTo(r * 0.55, -r * 0.68);
+      ctx.closePath();
+      ctx.fill();
+
+      // Eyebrows
+      ctx.strokeStyle = '#2c3e50';
+      ctx.lineWidth = Math.max(2.5, r * 0.11);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.55, -r * 0.36);
+      ctx.lineTo(-r * 0.18, -r * 0.24);
+      ctx.moveTo(r * 0.55, -r * 0.36);
+      ctx.lineTo(r * 0.18, -r * 0.24);
+      ctx.stroke();
+
+      // Eyes
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-r * 0.36, -r * 0.1, r * 0.22, 0, Math.PI * 2);
+      ctx.arc(r * 0.36, -r * 0.1, r * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Pupils
+      ctx.fillStyle = '#1a1a2e';
+      ctx.beginPath();
+      ctx.arc(-r * 0.34, -r * 0.1, r * 0.1, 0, Math.PI * 2);
+      ctx.arc(r * 0.34, -r * 0.1, r * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Piggy Snout
+      ctx.fillStyle = '#58d68d';
+      ctx.strokeStyle = '#1e8449';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, r * 0.18, r * 0.34, r * 0.24, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#145a32';
+      ctx.beginPath();
+      ctx.arc(-r * 0.12, r * 0.18, r * 0.07, 0, Math.PI * 2);
+      ctx.arc(r * 0.12, r * 0.18, r * 0.07, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Mouth / Expression
+      ctx.strokeStyle = '#1e8449';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      if (hurtRatio > 0.35) {
+        ctx.arc(0, r * 0.62, r * 0.2, Math.PI * 1.15, Math.PI * 1.85);
+      } else {
+        ctx.arc(0, r * 0.45, r * 0.26, 0.15 * Math.PI, 0.85 * Math.PI);
+      }
+      ctx.stroke();
+    } else {
+      // Classic Pig
+      ctx.fillStyle = '#58d68d';
+      ctx.strokeStyle = '#1e8449';
+      ctx.lineWidth = Math.max(2, r * 0.09);
+      ctx.beginPath();
+      ctx.arc(-r * 0.7, -r * 0.7, r * 0.24, 0, Math.PI * 2);
+      ctx.arc(r * 0.7, -r * 0.7, r * 0.24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-r * 0.4, -r * 0.12, r * 0.2, 0, Math.PI * 2);
+      ctx.arc(r * 0.4, -r * 0.12, r * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(-r * 0.38, -r * 0.12, r * 0.08, 0, Math.PI * 2);
+      ctx.arc(r * 0.38, -r * 0.12, r * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#82e0aa';
+      ctx.beginPath();
+      ctx.ellipse(0, r * 0.12, r * 0.36, r * 0.26, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#145a32';
+      ctx.beginPath();
+      ctx.arc(-r * 0.13, r * 0.12, r * 0.08, 0, Math.PI * 2);
+      ctx.arc(r * 0.13, r * 0.12, r * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Bandages/bruises if hurt
+    if (hurtRatio > 0.3) {
+      ctx.strokeStyle = '#c0392b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.5, -r * 0.55);
+      ctx.lineTo(-r * 0.3, -r * 0.35);
+      ctx.moveTo(-r * 0.3, -r * 0.55);
+      ctx.lineTo(-r * 0.5, -r * 0.35);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  function drawVilliPreview() {
+    previewCtx.clearRect(0, 0, 110, 110);
+    drawVilliCharacter(previewCtx, 55, 60, 38, 0, faceMode);
+  }
+
+  // Built-in Physics + Matter.js Compatibility
+  // We use a deterministic, responsive 2D impulse physics engine tailored for Angry Villi
+  // so it runs identically online or offline without CDN failures.
+  let currentLevel = 0;
+  let score = 0;
+  let totalScore = 0;
+  let birdsQueue = [];
+  let activeBird = null;
+  let flyingBirds = [];
+  let blocks = [];
+  let enemies = [];
+  let particles = [];
+  let floatingTexts = [];
+  let isDragging = false;
+  let dragPos = { x: SLING_X, y: SLING_Y };
+  let gameState = 'start'; // 'start' | 'playing' | 'won' | 'lost'
+  let settleTimer = 0;
+
+  const BIRD_STATS = {
+    red:    { color: '#e74c3c', radius: 18, mass: 1.4, name: 'Rojo' },
+    yellow: { color: '#f1c40f', radius: 17, mass: 1.2, name: 'Amarillo' },
+    blue:   { color: '#3498db', radius: 14, mass: 0.9, name: 'Azul' },
+    black:  { color: '#2c3e50', radius: 21, mass: 2.0, name: 'Negro' }
+  };
+
+  const MATERIAL_STATS = {
+    wood:  { color: '#d35400', border: '#6e2c00', hp: 70, score: 120 },
+    ice:   { color: '#74b9ff', border: '#0984e3', hp: 45, score: 100 },
+    stone: { color: '#95a5a6', border: '#2c3e50', hp: 130, score: 180 },
+    tnt:   { color: '#e74c3c', border: '#922b21', hp: 25, score: 250 }
+  };
+
+  const LEVELS = [
+    {
+      birds: ['red', 'yellow', 'blue', 'black'],
+      blocks: [
+        { x: 700, y: 500, w: 22, h: 120, mat: 'wood' },
+        { x: 820, y: 500, w: 22, h: 120, mat: 'wood' },
+        { x: 760, y: 428, w: 160, h: 22, mat: 'wood' },
+        { x: 715, y: 370, w: 20, h: 90, mat: 'ice' },
+        { x: 805, y: 370, w: 20, h: 90, mat: 'ice' },
+        { x: 760, y: 312, w: 130, h: 20, mat: 'wood' },
+        { x: 920, y: 515, w: 22, h: 90, mat: 'wood' },
+        { x: 1000, y: 515, w: 22, h: 90, mat: 'wood' },
+        { x: 960, y: 458, w: 110, h: 20, mat: 'wood' }
+      ],
+      enemies: [
+        { x: 760, y: 534, r: 24, hp: 50 },
+        { x: 760, y: 394, r: 22, hp: 45 },
+        { x: 960, y: 536, r: 22, hp: 45 }
+      ]
+    },
+    {
+      birds: ['yellow', 'blue', 'black', 'red', 'yellow'],
+      blocks: [
+        { x: 640, y: 500, w: 24, h: 120, mat: 'stone' },
+        { x: 750, y: 500, w: 24, h: 120, mat: 'stone' },
+        { x: 695, y: 428, w: 150, h: 22, mat: 'wood' },
+        { x: 695, y: 395, w: 42, h: 42, mat: 'tnt' },
+        { x: 850, y: 500, w: 22, h: 120, mat: 'wood' },
+        { x: 970, y: 500, w: 22, h: 120, mat: 'wood' },
+        { x: 910, y: 428, w: 160, h: 22, mat: 'stone' },
+        { x: 865, y: 368, w: 20, h: 95, mat: 'ice' },
+        { x: 955, y: 368, w: 20, h: 95, mat: 'ice' },
+        { x: 910, y: 308, w: 130, h: 20, mat: 'wood' }
+      ],
+      enemies: [
+        { x: 695, y: 534, r: 24, hp: 55 },
+        { x: 910, y: 534, r: 25, hp: 60 },
+        { x: 910, y: 394, r: 22, hp: 45 },
+        { x: 910, y: 274, r: 20, hp: 40 }
+      ]
+    },
+    {
+      birds: ['blue', 'yellow', 'black', 'red', 'black', 'yellow'],
+      blocks: [
+        { x: 610, y: 495, w: 24, h: 130, mat: 'stone' },
+        { x: 710, y: 495, w: 24, h: 130, mat: 'wood' },
+        { x: 660, y: 418, w: 140, h: 22, mat: 'stone' },
+        { x: 790, y: 535, w: 46, h: 46, mat: 'tnt' },
+        { x: 860, y: 495, w: 26, h: 130, mat: 'stone' },
+        { x: 1010, y: 495, w: 26, h: 130, mat: 'stone' },
+        { x: 935, y: 418, w: 185, h: 24, mat: 'wood' },
+        { x: 880, y: 350, w: 22, h: 110, mat: 'wood' },
+        { x: 990, y: 350, w: 22, h: 110, mat: 'wood' },
+        { x: 935, y: 282, w: 150, h: 22, mat: 'stone' },
+        { x: 935, y: 248, w: 42, h: 42, mat: 'tnt' }
+      ],
+      enemies: [
+        { x: 660, y: 534, r: 23, hp: 55 },
+        { x: 660, y: 382, r: 21, hp: 45 },
+        { x: 935, y: 526, r: 32, hp: 95 }, // Boss Villi
+        { x: 935, y: 382, r: 23, hp: 55 },
+        { x: 790, y: 485, r: 20, hp: 40 }
+      ]
+    }
+  ];
+
+  function loadLevel(idx) {
+    currentLevel = idx;
+    const lvl = LEVELS[currentLevel];
+    birdsQueue = [...lvl.birds];
+    flyingBirds = [];
+    particles = [];
+    floatingTexts = [];
+    isDragging = false;
+    settleTimer = 0;
+
+    blocks = lvl.blocks.map(b => {
+      const st = MATERIAL_STATS[b.mat];
+      return {
+        x: b.x, y: b.y, w: b.w, h: b.h,
+        vx: 0, vy: 0, angle: 0, va: 0,
+        mat: b.mat, hp: st.hp, maxHp: st.hp,
+        color: st.color, border: st.border, scoreVal: st.score
+      };
+    });
+
+    enemies = lvl.enemies.map(e => ({
+      x: e.x, y: e.y, r: e.r,
+      vx: 0, vy: 0, angle: 0, va: 0,
+      hp: e.hp, maxHp: e.hp
+    }));
+
+    spawnNextBird();
+    updateHUD();
+  }
+
+  function spawnNextBird() {
+    if (birdsQueue.length === 0) {
+      activeBird = null;
+      updateHUD();
+      return;
+    }
+    const type = birdsQueue.shift();
+    const st = BIRD_STATS[type];
+    activeBird = {
+      type,
+      x: SLING_X,
+      y: SLING_Y,
+      r: st.radius,
+      color: st.color,
+      mass: st.mass,
+      vx: 0,
+      vy: 0,
+      angle: 0,
+      powerUsed: false,
+      trail: []
+    };
+    dragPos = { x: SLING_X, y: SLING_Y };
+    updateHUD();
+  }
+
+  function updateHUD() {
+    document.getElementById('ui-level').textContent = `${currentLevel + 1}/${LEVELS.length}`;
+    document.getElementById('ui-score').textContent = totalScore + score;
+    document.getElementById('ui-enemies').textContent = enemies.length;
+    const totalBirdsLeft = birdsQueue.length + (activeBird ? 1 : 0);
+    document.getElementById('ui-birds').textContent = totalBirdsLeft;
+  }
+
+  function addFloatingText(x, y, text, color = '#ffeaa7') {
+    floatingTexts.push({ x, y, text, color, life: 1.0 });
+  }
+
+  function spawnExplosion(x, y, radius = 135, power = 16) {
+    playSound('boom');
+    for (let i = 0; i < 36; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 2 + Math.random() * 9;
+      particles.push({
+        x, y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd - 2,
+        r: 4 + Math.random() * 8,
+        color: ['#e74c3c', '#f39c12', '#f1c40f', '#2c3e50'][i % 4],
+        life: 1.0
+      });
+    }
+
+    // Damage blocks
+    blocks.forEach(b => {
+      const dx = b.x - x;
+      const dy = b.y - y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < radius) {
+        const factor = 1 - dist / radius;
+        b.hp -= 115 * factor;
+        const nx = dx / (dist || 1);
+        const ny = dy / (dist || 1);
+        b.vx += nx * power * factor;
+        b.vy += (ny - 0.4) * power * factor;
+        b.va += (Math.random() - 0.5) * 0.2;
+      }
+    });
+
+    // Damage enemies
+    enemies.forEach(e => {
+      const dx = e.x - x;
+      const dy = e.y - y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < radius) {
+        const factor = 1 - dist / radius;
+        e.hp -= 95 * factor;
+        const nx = dx / (dist || 1);
+        const ny = dy / (dist || 1);
+        e.vx += nx * power * factor;
+        e.vy += (ny - 0.4) * power * factor;
+      }
+    });
+  }
+
+  function activateBirdPower() {
+    if (flyingBirds.length === 0) return;
+    const bird = flyingBirds[0];
+    if (!bird || bird.powerUsed) return;
+    bird.powerUsed = true;
+
+    if (bird.type === 'yellow') {
+      playSound('power');
+      bird.vx *= 2.2;
+      bird.vy *= 1.6;
+      addFloatingText(bird.x, bird.y - 25, '¡TURBO!', '#f1c40f');
+      for (let i = 0; i < 15; i++) {
+        particles.push({
+          x: bird.x, y: bird.y,
+          vx: -bird.vx * 0.2 + (Math.random() - 0.5) * 3,
+          vy: (Math.random() - 0.5) * 3,
+          r: 5, color: '#f1c40f', life: 0.8
+        });
+      }
+    } else if (bird.type === 'blue') {
+      playSound('power');
+      addFloatingText(bird.x, bird.y - 25, '¡TRIPLE!', '#3498db');
+      [-0.26, 0.26].forEach(offset => {
+        const spd = Math.hypot(bird.vx, bird.vy);
+        const ang = Math.atan2(bird.vy, bird.vx) + offset;
+        flyingBirds.push({
+          ...bird,
+          x: bird.x,
+          y: bird.y + offset * 30,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          r: 12,
+          powerUsed: true,
+          trail: []
+        });
+      });
+    } else if (bird.type === 'black') {
+      addFloatingText(bird.x, bird.y - 25, '¡BOOM!', '#e74c3c');
+      spawnExplosion(bird.x, bird.y, 150, 18);
+      bird.remove = true;
+    } else if (bird.type === 'red') {
+      playSound('power');
+      bird.vy += 4;
+      bird.vx *= 1.25;
+      addFloatingText(bird.x, bird.y - 25, '¡IMPACTO!', '#e74c3c');
+    }
+  }
+
+  // Input Handling
+  function getPointerPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+    return {
+      x: (clientX - rect.left) * (W / rect.width),
+      y: (clientY - rect.top) * (H / rect.height)
+    };
+  }
+
+  function onPointerDown(evt) {
+    if (gameState !== 'playing') return;
+    initAudio();
+    const pos = getPointerPos(evt);
+
+    if (flyingBirds.length > 0) {
+      activateBirdPower();
+      return;
+    }
+
+    if (activeBird) {
+      const dist = Math.hypot(pos.x - activeBird.x, pos.y - activeBird.y);
+      if (dist <= 48) {
+        isDragging = true;
+        dragPos = pos;
+      }
+    }
+  }
+
+  function onPointerMove(evt) {
+    if (!isDragging || !activeBird) return;
+    const pos = getPointerPos(evt);
+    let dx = pos.x - SLING_X;
+    let dy = pos.y - SLING_Y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > MAX_PULL) {
+      dx = (dx / dist) * MAX_PULL;
+      dy = (dy / dist) * MAX_PULL;
+    }
+    dragPos = { x: SLING_X + dx, y: SLING_Y + dy };
+    activeBird.x = dragPos.x;
+    activeBird.y = dragPos.y;
+  }
+
+  function onPointerUp() {
+    if (!isDragging || !activeBird) return;
+    isDragging = false;
+    const dx = SLING_X - activeBird.x;
+    const dy = SLING_Y - activeBird.y;
+    const pullDist = Math.hypot(dx, dy);
+
+    if (pullDist < 14) {
+      activeBird.x = SLING_X;
+      activeBird.y = SLING_Y;
+      return;
+    }
+
+    playSound('launch');
+    const powerScale = 0.23;
+    activeBird.vx = dx * powerScale;
+    activeBird.vy = dy * powerScale;
+    flyingBirds.push(activeBird);
+    activeBird = null;
+    settleTimer = 0;
+    updateHUD();
+  }
+
+  canvas.addEventListener('mousedown', onPointerDown);
+  window.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('mouseup', onPointerUp);
+
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); onPointerDown(e); }, { passive: false });
+  window.addEventListener('touchmove', e => { if (isDragging) e.preventDefault(); onPointerMove(e); }, { passive: false });
+  window.addEventListener('touchend', onPointerUp);
+
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space' && gameState === 'playing') {
+      e.preventDefault();
+      activateBirdPower();
+    }
+  });
+
+  // Physics Step
+  function circleRectCollide(c, b) {
+    const hw = b.w / 2;
+    const hh = b.h / 2;
+    const cx = Math.max(b.x - hw, Math.min(c.x, b.x + hw));
+    const cy = Math.max(b.y - hh, Math.min(c.y, b.y + hh));
+    const dx = c.x - cx;
+    const dy = c.y - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist < c.r) {
+      const nx = dist === 0 ? 0 : dx / dist;
+      const ny = dist === 0 ? -1 : dy / dist;
+      const overlap = c.r - dist;
+      return { nx, ny, overlap };
+    }
+    return null;
+  }
+
+  function stepPhysics() {
+    if (gameState !== 'playing') return;
+
+    const gravity = 0.36;
+
+    // Update flying birds
+    flyingBirds.forEach(bird => {
+      if (Math.random() < 0.5) {
+        bird.trail.push({ x: bird.x, y: bird.y, r: bird.r * 0.35 });
+        if (bird.trail.length > 26) bird.trail.shift();
+      }
+      bird.vy += gravity;
+      bird.x += bird.vx;
+      bird.y += bird.vy;
+      bird.angle += bird.vx * 0.03;
+
+      // Ground collision
+      if (bird.y + bird.r > GROUND_Y) {
+        bird.y = GROUND_Y - bird.r;
+        bird.vy = -bird.vy * 0.42;
+        bird.vx *= 0.78;
+        if (Math.abs(bird.vy) < 1.2) bird.vy = 0;
+      }
+
+      // Collide with blocks
+      blocks.forEach(b => {
+        const col = circleRectCollide(bird, b);
+        if (col) {
+          bird.x += col.nx * col.overlap;
+          bird.y += col.ny * col.overlap;
+          const relSpeed = Math.hypot(bird.vx - b.vx, bird.vy - b.vy);
+          if (relSpeed > 1.8) {
+            playSound('hit');
+            const dmg = relSpeed * bird.mass * 4.4;
+            b.hp -= dmg;
+            b.vx += bird.vx * 0.42;
+            b.vy += bird.vy * 0.32;
+            b.va += (bird.y - b.y) * 0.004;
+            bird.vx *= 0.58;
+            bird.vy *= 0.58;
+
+            if (bird.type === 'black' && !bird.powerUsed) {
+              bird.powerUsed = true;
+              spawnExplosion(bird.x, bird.y, 145, 17);
+              bird.remove = true;
+            }
+          }
+        }
+      });
+
+      // Collide with enemies
+      enemies.forEach(e => {
+        const dx = bird.x - e.x;
+        const dy = bird.y - e.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < bird.r + e.r) {
+          const nx = dx / (dist || 1);
+          const ny = dy / (dist || 1);
+          const overlap = bird.r + e.r - dist;
+          bird.x += nx * overlap * 0.5;
+          bird.y += ny * overlap * 0.5;
+          e.x -= nx * overlap * 0.5;
+          e.y -= ny * overlap * 0.5;
+
+          const relSpeed = Math.hypot(bird.vx - e.vx, bird.vy - e.vy);
+          e.hp -= relSpeed * bird.mass * 5.5;
+          e.vx += bird.vx * 0.55;
+          e.vy += bird.vy * 0.45;
+          bird.vx *= 0.5;
+          bird.vy *= 0.5;
+
+          if (bird.type === 'black' && !bird.powerUsed) {
+            bird.powerUsed = true;
+            spawnExplosion(bird.x, bird.y, 145, 17);
+            bird.remove = true;
+          }
+        }
+      });
+
+      if (bird.x > W + 80 || bird.x < -80) {
+        bird.remove = true;
+      }
+    });
+
+    // Update blocks
+    blocks.forEach((b, i) => {
+      b.vy += gravity * 0.65;
+      b.x += b.vx;
+      b.y += b.vy;
+      b.angle += b.va;
+      b.vx *= 0.92;
+      b.va *= 0.88;
+
+      const hh = b.h / 2;
+      if (b.y + hh > GROUND_Y) {
+        const impact = Math.abs(b.vy);
+        if (impact > 6.5) b.hp -= impact * 4.5;
+        b.y = GROUND_Y - hh;
+        b.vy = -b.vy * 0.2;
+        b.vx *= 0.72;
+        if (Math.abs(b.vy) < 0.8) b.vy = 0;
+      }
+
+      // Block-block support & collision
+      for (let j = i + 1; j < blocks.length; j++) {
+        const b2 = blocks[j];
+        const dx = b2.x - b.x;
+        const dy = b2.y - b.y;
+        const ox = (b.w + b2.w) / 2 - Math.abs(dx);
+        const oy = (b.h + b2.h) / 2 - Math.abs(dy);
+        if (ox > 0 && oy > 0) {
+          if (ox < oy) {
+            const sign = dx > 0 ? 1 : -1;
+            b.x -= sign * ox * 0.5;
+            b2.x += sign * ox * 0.5;
+            const avgVx = (b.vx + b2.vx) * 0.5;
+            b.vx = avgVx;
+            b2.vx = avgVx;
+          } else {
+            const sign = dy > 0 ? 1 : -1;
+            b.y -= sign * oy * 0.5;
+            b2.y += sign * oy * 0.5;
+            const relVy = Math.abs(b.vy - b2.vy);
+            if (relVy > 5.5) {
+              b.hp -= relVy * 3.5;
+              b2.hp -= relVy * 3.5;
+            }
+            b.vy = 0;
+            b2.vy = 0;
+          }
+        }
+      }
+    });
+
+    // Update enemies
+    enemies.forEach(e => {
+      e.vy += gravity * 0.75;
+      e.x += e.vx;
+      e.y += e.vy;
+      e.vx *= 0.94;
+
+      if (e.y + e.r > GROUND_Y) {
+        const impact = Math.abs(e.vy);
+        if (impact > 5.2) e.hp -= impact * 6;
+        e.y = GROUND_Y - e.r;
+        e.vy = -e.vy * 0.28;
+        e.vx *= 0.75;
+      }
+
+      // Enemy-block collision
+      blocks.forEach(b => {
+        const col = circleRectCollide(e, b);
+        if (col) {
+          e.x += col.nx * col.overlap;
+          e.y += col.ny * col.overlap;
+          const relSpeed = Math.hypot(e.vx - b.vx, e.vy - b.vy);
+          if (relSpeed > 3.0) {
+            e.hp -= relSpeed * 5.2;
+            b.hp -= relSpeed * 2.5;
+          }
+          if (col.ny < -0.5) {
+            e.vy = b.vy;
+            e.vx *= 0.85;
+          } else {
+            e.vx += b.vx * 0.4;
+          }
+        }
+      });
+    });
+
+    // Check destroyed blocks
+    blocks = blocks.filter(b => {
+      if (b.hp <= 0) {
+        score += b.scoreVal;
+        addFloatingText(b.x, b.y, `+${b.scoreVal}`, '#ffeaa7');
+        if (b.mat === 'tnt') {
+          spawnExplosion(b.x, b.y, 155, 18);
+        } else {
+          playSound('hit');
+          for (let k = 0; k < 10; k++) {
+            particles.push({
+              x: b.x + (Math.random() - 0.5) * b.w,
+              y: b.y + (Math.random() - 0.5) * b.h,
+              vx: (Math.random() - 0.5) * 6,
+              vy: -Math.random() * 5,
+              r: 4 + Math.random() * 4,
+              color: b.color,
+              life: 0.9
+            });
+          }
+        }
+        updateHUD();
+        return false;
+      }
+      return true;
+    });
+
+    // Check defeated enemies
+    enemies = enemies.filter(e => {
+      if (e.hp <= 0 || e.x > W + 90 || e.x < -90) {
+        playSound('pig');
+        score += 500;
+        addFloatingText(e.x, e.y - 10, '+500 🐷', '#2ecc71');
+        for (let k = 0; k < 18; k++) {
+          particles.push({
+            x: e.x, y: e.y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            r: 5 + Math.random() * 5,
+            color: '#2ecc71',
+            life: 1.0
+          });
+        }
+        updateHUD();
+        return false;
+      }
+      return true;
+    });
+
+    // Clean up stopped/removed flying birds
+    flyingBirds = flyingBirds.filter(b => !b.remove);
+    if (flyingBirds.length > 0) {
+      const allSlow = flyingBirds.every(b => Math.hypot(b.vx, b.vy) < 0.65 && b.y >= GROUND_Y - b.r - 4);
+      settleTimer++;
+      if (allSlow || settleTimer > 210) {
+        flyingBirds = [];
+        settleTimer = 0;
+        if (enemies.length > 0) {
+          spawnNextBird();
+        }
+      }
+    }
+
+    // Check win/loss conditions
+    if (enemies.length === 0 && gameState === 'playing') {
+      const bonus = (birdsQueue.length + (activeBird ? 1 : 0)) * 300;
+      score += bonus;
+      totalScore += score;
+      score = 0;
+      updateHUD();
+      gameState = 'won';
+      playSound('win');
+      setTimeout(() => showModal(true), 650);
+    } else if (!activeBird && flyingBirds.length === 0 && birdsQueue.length === 0 && enemies.length > 0 && gameState === 'playing') {
+      settleTimer++;
+      if (settleTimer > 95) {
+        gameState = 'lost';
+        playSound('lose');
+        showModal(false);
+      }
+    }
+
+    // Update particles & floating texts
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.22;
+      p.life -= 0.025;
+    });
+    particles = particles.filter(p => p.life > 0);
+
+    floatingTexts.forEach(ft => {
+      ft.y -= 1.2;
+      ft.life -= 0.022;
+    });
+    floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+  }
+
+  // Rendering
+  function drawBird(b) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.angle || 0);
+
+    // Body
+    ctx.fillStyle = b.color;
+    ctx.strokeStyle = '#2c3e50';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, b.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Belly highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.arc(0, b.r * 0.35, b.r * 0.55, 0, Math.PI);
+    ctx.fill();
+
+    // Fuse for Black Bomb Bird
+    if (b.type === 'black') {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, -b.r);
+      ctx.lineTo(4, -b.r - 9);
+      ctx.stroke();
+      ctx.fillStyle = '#f39c12';
+      ctx.beginPath();
+      ctx.arc(4, -b.r - 10, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(b.r * 0.18, -b.r * 0.12, b.r * 0.24, 0, Math.PI * 2);
+    ctx.arc(b.r * 0.52, -b.r * 0.12, b.r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(b.r * 0.24, -b.r * 0.12, b.r * 0.1, 0, Math.PI * 2);
+    ctx.arc(b.r * 0.56, -b.r * 0.12, b.r * 0.09, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Angry Eyebrows
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-b.r * 0.05, -b.r * 0.42);
+    ctx.lineTo(b.r * 0.38, -b.r * 0.26);
+    ctx.lineTo(b.r * 0.72, -b.r * 0.42);
+    ctx.stroke();
+
+    // Beak
+    ctx.fillStyle = '#f39c12';
+    ctx.beginPath();
+    ctx.moveTo(b.r * 0.65, -b.r * 0.05);
+    ctx.lineTo(b.r * 1.18, b.r * 0.12);
+    ctx.lineTo(b.r * 0.65, b.r * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function render() {
+    // Sky gradient
+    const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+    sky.addColorStop(0, '#56ccf2');
+    sky.addColorStop(1, '#dff9fb');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    // Clouds & distant hills
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    [[180, 110, 42], [220, 105, 52], [260, 112, 38],
+     [560, 85, 45], [605, 80, 55], [650, 90, 40],
+     [900, 120, 40], [940, 115, 48]].forEach(([cx, cy, cr]) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Hills
+    ctx.fillStyle = '#a3e4d7';
+    ctx.beginPath();
+    ctx.arc(260, GROUND_Y, 240, Math.PI, 0);
+    ctx.arc(760, GROUND_Y, 310, Math.PI, 0);
+    ctx.fill();
+
+    // Waiting birds queue on ground
+    birdsQueue.forEach((type, idx) => {
+      const st = BIRD_STATS[type];
+      drawBird({
+        type,
+        x: 115 - idx * 36,
+        y: GROUND_Y - st.radius,
+        r: st.radius,
+        color: st.color,
+        angle: 0
+      });
+    });
+
+    // Slingshot back fork
+    ctx.strokeStyle = '#6e2c00';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(SLING_X, GROUND_Y);
+    ctx.lineTo(SLING_X, SLING_Y + 28);
+    ctx.lineTo(SLING_X + 18, SLING_Y - 8);
+    ctx.stroke();
+
+    // Slingshot back elastic band
+    if (activeBird) {
+      ctx.strokeStyle = '#3e2723';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(SLING_X + 16, SLING_Y - 6);
+      ctx.lineTo(activeBird.x, activeBird.y);
+      ctx.stroke();
+    }
+
+    // Trajectory prediction dots when dragging
+    if (isDragging && activeBird) {
+      const vx = (SLING_X - activeBird.x) * 0.23;
+      const vy = (SLING_Y - activeBird.y) * 0.23;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.strokeStyle = '#2c3e50';
+      ctx.lineWidth = 1.5;
+      for (let t = 3; t <= 36; t += 3) {
+        const px = activeBird.x + vx * t;
+        const py = activeBird.y + vy * t + 0.5 * 0.36 * t * t;
+        if (py > GROUND_Y) break;
+        ctx.beginPath();
+        ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    // Active bird in slingshot
+    if (activeBird) {
+      drawBird(activeBird);
+      // Front elastic band
+      ctx.strokeStyle = '#3e2723';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(SLING_X - 16, SLING_Y - 6);
+      ctx.lineTo(activeBird.x, activeBird.y);
+      ctx.stroke();
+    }
+
+    // Slingshot front fork
+    ctx.strokeStyle = '#873600';
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.moveTo(SLING_X, SLING_Y + 28);
+    ctx.lineTo(SLING_X - 18, SLING_Y - 8);
+    ctx.stroke();
+
+    // Flying bird trails & birds
+    flyingBirds.forEach(bird => {
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      bird.trail.forEach(pt => {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      drawBird(bird);
+    });
+
+    // Blocks
+    blocks.forEach(b => {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.angle);
+      ctx.fillStyle = b.color;
+      ctx.strokeStyle = b.border;
+      ctx.lineWidth = 3;
+      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+      ctx.strokeRect(-b.w / 2, -b.h / 2, b.w, b.h);
+
+      if (b.mat === 'tnt') {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 13px Fredoka One, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('TNT', 0, 0);
+      } else if (b.hp < b.maxHp * 0.65) {
+        // Damage cracks
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-b.w * 0.25, -b.h * 0.25);
+        ctx.lineTo(0, 0);
+        ctx.lineTo(b.w * 0.2, -b.h * 0.15);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+
+    // Villi Enemies
+    enemies.forEach(e => {
+      const hurtRatio = 1 - e.hp / e.maxHp;
+      drawVilliCharacter(ctx, e.x, e.y, e.r, hurtRatio, faceMode);
+    });
+
+    // Ground
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect(0, GROUND_Y, W, 16);
+    ctx.fillStyle = '#8d6e63';
+    ctx.fillRect(0, GROUND_Y + 16, W, H - GROUND_Y - 16);
+    ctx.strokeStyle = '#27ae60';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    ctx.lineTo(W, GROUND_Y);
+    ctx.stroke();
+
+    // Particles
+    particles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // Floating score texts
+    floatingTexts.forEach(ft => {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, ft.life);
+      ctx.font = 'bold 20px Fredoka One, cursive';
+      ctx.fillStyle = ft.color;
+      ctx.strokeStyle = '#2c3e50';
+      ctx.lineWidth = 4;
+      ctx.textAlign = 'center';
+      ctx.strokeText(ft.text, ft.x, ft.y);
+      ctx.fillText(ft.text, ft.x, ft.y);
+      ctx.restore();
+    });
+  }
+
+  function loop() {
+    stepPhysics();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // Modals & UI Buttons
+  const startOverlay = document.getElementById('start-overlay');
+  const modalOverlay = document.getElementById('modal-overlay');
+  const modalTitle = document.getElementById('modal-title');
+  const modalSubtitle = document.getElementById('modal-subtitle');
+  const modalScore = document.getElementById('modal-score');
+  const btnModalNext = document.getElementById('btn-modal-next');
+
+  function showModal(won) {
+    modalOverlay.classList.remove('hidden');
+    modalScore.textContent = totalScore + score;
+    if (won) {
+      if (currentLevel < LEVELS.length - 1) {
+        modalTitle.textContent = '¡NIVEL SUPERADO!';
+        modalSubtitle.textContent = '¡Todos los Villis fueron derribados!';
+        btnModalNext.textContent = '⏭️ Siguiente Nivel';
+        btnModalNext.style.display = 'inline-flex';
+      } else {
+        modalTitle.textContent = '🏆 ¡VICTORIA TOTAL!';
+        modalSubtitle.textContent = '¡Has completado todos los niveles de Angry Villi!';
+        btnModalNext.textContent = '🎉 Jugar desde el Nivel 1';
+        btnModalNext.style.display = 'inline-flex';
+      }
+    } else {
+      modalTitle.textContent = '¡INTÉNTALO DE NUEVO!';
+      modalSubtitle.textContent = 'Todavía quedan cerditos Villi en pie.';
+      btnModalNext.style.display = 'none';
+    }
+  }
+
+  document.getElementById('btn-play').addEventListener('click', () => {
+    initAudio();
+    startOverlay.classList.add('hidden');
+    gameState = 'playing';
+    totalScore = 0;
+    score = 0;
+    loadLevel(0);
+  });
+
+  document.getElementById('btn-restart').addEventListener('click', () => {
+    modalOverlay.classList.add('hidden');
+    score = 0;
+    gameState = 'playing';
+    loadLevel(currentLevel);
+  });
+
+  document.getElementById('btn-modal-retry').addEventListener('click', () => {
+    modalOverlay.classList.add('hidden');
+    score = 0;
+    gameState = 'playing';
+    loadLevel(currentLevel);
+  });
+
+  btnModalNext.addEventListener('click', () => {
+    modalOverlay.classList.add('hidden');
+    score = 0;
+    gameState = 'playing';
+    if (currentLevel < LEVELS.length - 1) {
+      loadLevel(currentLevel + 1);
+    } else {
+      totalScore = 0;
+      loadLevel(0);
+    }
+  });
+
+  document.getElementById('btn-toggle-face').addEventListener('click', () => {
+    if (faceMode === 'photo') {
+      faceMode = 'villi';
+    } else if (faceMode === 'villi') {
+      faceMode = 'pig';
+    } else {
+      faceMode = 'photo';
+    }
+    updateFaceModeLabel();
+  });
+
+  const fileInput = document.getElementById('file-input');
+  document.getElementById('btn-upload').addEventListener('click', () => fileInput.click());
+  document.getElementById('btn-upload-start').addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        customPhoto = img;
+        customPhotoLoaded = true;
+        faceMode = 'photo';
+        updateFaceModeLabel();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function downloadHTML() {
+    const htmlStr = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    const blob = new Blob([htmlStr], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'angry-villi.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  document.getElementById('btn-download-hud').addEventListener('click', downloadHTML);
+  document.getElementById('btn-download-start').addEventListener('click', downloadHTML);
+
+  const btnSound = document.getElementById('btn-sound');
+  btnSound.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    btnSound.textContent = soundEnabled ? '🔊' : '🔇';
+  });
+
+  // Initialize
+  drawVilliPreview();
+  loadLevel(0);
+  loop();
+})();
+</script>
+</body>
+</html>
