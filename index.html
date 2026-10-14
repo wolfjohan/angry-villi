@@ -214,11 +214,48 @@
     #file-input {
       display: none;
     }
+
+    .music-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: #2c3e50;
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 14px;
+      margin: 0 0 14px;
+      font-size: 13px;
+      font-weight: 800;
+      box-shadow: 0 4px 0 #1a252f;
+    }
+
+    .music-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-align: left;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #yt-hidden-container {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      bottom: 0;
+      left: 0;
+      opacity: 0.01;
+      pointer-events: none;
+      overflow: hidden;
+    }
   </style>
 </head>
 <body>
 
 <div id="game-wrapper">
+  <div id="yt-hidden-container"><div id="yt-player"></div></div>
   <canvas id="game-canvas" width="1100" height="620"></canvas>
 
   <div class="hud-bar">
@@ -235,7 +272,8 @@
       <button class="btn btn-green" id="btn-upload">📸 Subir Foto</button>
       <input type="file" id="file-input" accept="image/*">
       <button class="btn btn-purple" id="btn-download-hud">💾 Descargar .HTML</button>
-      <button class="btn" id="btn-sound">🔊</button>
+      <button class="btn btn-green" id="btn-music" title="Activar/Pausar Música">🎵 Música: ON</button>
+      <button class="btn" id="btn-sound" title="Efectos de sonido">🔊</button>
       <button class="btn btn-red" id="btn-restart">🔄</button>
     </div>
   </div>
@@ -258,6 +296,16 @@
           <div>🔵 <b>Azul:</b> Clic en el aire para <b>Dividirse en 3</b>.</div>
           <div>⚫ <b>Negro:</b> Clic en el aire o impacto para <b>Explotar</b>.</div>
         </div>
+      </div>
+
+      <div class="music-box">
+        <div class="music-title">
+          <span>🎶</span>
+          <span id="music-status-text">Intro: Que Limones (Dembow Remix)</span>
+        </div>
+        <button class="btn btn-green" id="btn-start-music" style="font-size:13px; padding:5px 12px;">
+          🔊 Sonar Intro
+        </button>
       </div>
 
       <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
@@ -1538,6 +1586,7 @@
 
   document.getElementById('btn-play').addEventListener('click', () => {
     initAudio();
+    if (musicEnabled) tryPlayMusic();
     startOverlay.classList.add('hidden');
     gameState = 'playing';
     totalScore = 0;
@@ -1618,6 +1667,132 @@
 
   document.getElementById('btn-download-hud').addEventListener('click', downloadHTML);
   document.getElementById('btn-download-start').addEventListener('click', downloadHTML);
+
+  // YouTube Background / Intro Music (Video ID: nMdcFam9PUo)
+  const YT_VIDEO_ID = 'nMdcFam9PUo';
+  let ytPlayer = null;
+  let ytReady = false;
+  let musicEnabled = true;
+  let musicPlaying = false;
+
+  const btnMusic = document.getElementById('btn-music');
+  const btnStartMusic = document.getElementById('btn-start-music');
+  const musicStatusText = document.getElementById('music-status-text');
+
+  function updateMusicUI() {
+    if (musicEnabled && musicPlaying) {
+      btnMusic.textContent = '🎵 Música: ON';
+      btnMusic.className = 'btn btn-green';
+      btnStartMusic.textContent = '⏸️ Pausar Intro';
+      musicStatusText.textContent = 'Sonando: Que Limones (Dembow)';
+    } else if (musicEnabled && !musicPlaying) {
+      btnMusic.textContent = '🎵 Música: Lista';
+      btnMusic.className = 'btn btn-blue';
+      btnStartMusic.textContent = '🔊 Sonar Intro';
+      musicStatusText.textContent = 'Intro: Que Limones (Haz clic para sonar)';
+    } else {
+      btnMusic.textContent = '🔇 Música: OFF';
+      btnMusic.className = 'btn btn-red';
+      btnStartMusic.textContent = '🔊 Activar Intro';
+      musicStatusText.textContent = 'Música en pausa';
+    }
+  }
+
+  function tryPlayMusic() {
+    if (!musicEnabled || !ytReady || !ytPlayer) return;
+    try {
+      ytPlayer.unMute();
+      ytPlayer.setVolume(85);
+      ytPlayer.playVideo();
+    } catch (e) {}
+  }
+
+  function toggleMusic() {
+    musicEnabled = !musicEnabled;
+    if (!ytReady || !ytPlayer) {
+      updateMusicUI();
+      return;
+    }
+    try {
+      if (musicEnabled) {
+        ytPlayer.unMute();
+        ytPlayer.setVolume(85);
+        ytPlayer.playVideo();
+      } else {
+        ytPlayer.pauseVideo();
+      }
+    } catch (e) {}
+    updateMusicUI();
+  }
+
+  btnMusic.addEventListener('click', toggleMusic);
+  btnStartMusic.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!musicPlaying) {
+      musicEnabled = true;
+      tryPlayMusic();
+    } else {
+      toggleMusic();
+    }
+  });
+
+  // Unlock music automatically on first user interaction anywhere on the start screen
+  function unlockMusicOnGesture() {
+    if (musicEnabled && !musicPlaying && ytReady) {
+      tryPlayMusic();
+    }
+  }
+  window.addEventListener('pointerdown', unlockMusicOnGesture);
+  window.addEventListener('keydown', unlockMusicOnGesture);
+
+  // Load YouTube IFrame Player API
+  window.onYouTubeIframeAPIReady = function() {
+    ytPlayer = new YT.Player('yt-player', {
+      width: '200',
+      height: '200',
+      videoId: YT_VIDEO_ID,
+      playerVars: {
+        autoplay: 1,
+        loop: 1,
+        playlist: YT_VIDEO_ID,
+        controls: 0,
+        disablekb: 1,
+        fs: 0,
+        modestbranding: 1,
+        playsinline: 1,
+        rel: 0
+      },
+      events: {
+        onReady: function(event) {
+          ytReady = true;
+          if (musicEnabled) {
+            event.target.unMute();
+            event.target.setVolume(85);
+            event.target.playVideo();
+          }
+          updateMusicUI();
+        },
+        onStateChange: function(event) {
+          if (event.data === YT.PlayerState.PLAYING) {
+            musicPlaying = true;
+          } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+            musicPlaying = false;
+            if (event.data === YT.PlayerState.ENDED && musicEnabled) {
+              event.target.playVideo();
+            }
+          }
+          updateMusicUI();
+        }
+      }
+    });
+  };
+
+  (function loadYT() {
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+  })();
 
   const btnSound = document.getElementById('btn-sound');
   btnSound.addEventListener('click', () => {
